@@ -19,8 +19,10 @@ library
   ghc-options:         -Wall
   hs-source-dirs:      src
   exposed-modules:     EventSource
+                     , Projection
                      , TaskWorkflow
   build-depends:       base >= 4.7 && < 5
+                     , containers
 
 executable eventsourcing
   default-language:    Haskell2010
