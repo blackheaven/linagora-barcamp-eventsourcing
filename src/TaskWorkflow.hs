@@ -8,7 +8,7 @@ module TaskWorkflow
     , TaskWorkflowEvent(..)
     ) where
 
-import EventSource(Aggregate(..), CommandApplier(..), EventApplier(..))
+import EventSource(Aggregate(..), Decision(..), Projection(..))
 
 type TaskWorkflowTyper a = a TaskWorkflow TaskWorkflowCommand TaskWorkflowEvent
 
@@ -47,19 +47,19 @@ newTaskWorkflow = TaskWorkflow Nothing Waiting
 waitingTaskWorkflow :: TaskWorkflowTyper Aggregate
 waitingTaskWorkflow = Aggregate newTaskWorkflow [] applyCommandTaskWorkflow applyEventTaskWorkflow
 
-applyCommandTaskWorkflow :: TaskWorkflowTyper CommandApplier
-applyCommandTaskWorkflow = CommandApplier $ \a c -> case c of
-                                                         AssignTask u -> onNotAssigned a (Just u) [AssignedTask u]
-                                                         AchieveTask  -> onStatus a Started [Done]
-                                                         RestartTask  -> onStatus a Archived [TaskReDone]
-                                                         UnassignTask -> onNotAssigned a Nothing [UnassignedTask]
-                                                         PostponeTask -> onStatus a Started [PostponedTask]
-                                                         StartTask    -> onStatus a Waiting [TaskStarted]
+applyCommandTaskWorkflow :: TaskWorkflowTyper Decision
+applyCommandTaskWorkflow = Decision $ \a c -> case c of
+                                                   AssignTask u -> onNotAssigned a (Just u) [AssignedTask u]
+                                                   AchieveTask  -> onStatus a Started [Done]
+                                                   RestartTask  -> onStatus a Archived [TaskReDone]
+                                                   UnassignTask -> onNotAssigned a Nothing [UnassignedTask]
+                                                   PostponeTask -> onStatus a Started [PostponedTask]
+                                                   StartTask    -> onStatus a Waiting [TaskStarted]
     where onStatus a v x = if status (projection a) == v then x else []
           onNotAssigned a v x = if assigned (projection a) == v then [] else x
 
-applyEventTaskWorkflow :: TaskWorkflowTyper EventApplier
-applyEventTaskWorkflow = EventApplier $ \a e -> case e of
+applyEventTaskWorkflow :: TaskWorkflowTyper Projection
+applyEventTaskWorkflow = Projection $ \a e -> case e of
                                                      AssignedTask u -> updateTaskWorkflow a (\t -> t { assigned = Just u }) e
                                                      Done           -> updateTaskWorkflow a (\t -> t { status = Archived }) e
                                                      TaskReDone     -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
