@@ -52,20 +52,18 @@ instanciateWorkflow w = Aggregate w applyCommandWorkflow applyEventWorkflow
 
 applyCommandWorkflow :: WorkflowTyper CommandApplier
 applyCommandWorkflow = CommandApplier $ \ w c -> case c of
-                                                      AssignTask u -> if assigned w == Just u then [] else [AssignedTask u]
-                                                      AchieveTask -> if status w == Started then [Done] else []
-                                                      RestartTask -> if status w == Archived then [TaskReDone] else []
-                                                      UnassignTask -> maybe [] (const [UnassignedTask]) (assigned w)
-                                                      PostponeTask -> if status w == Started then [PostponedTask] else []
-                                                      StartTask -> if status w == Waiting then [TaskStarted] else []
-                                                      _ -> undefined
+                                                      AssignTask u -> if assigned w == Just u   then [] else [AssignedTask u]
+                                                      AchieveTask  -> if status w   == Started  then [Done]          else []
+                                                      RestartTask  -> if status w   == Archived then [TaskReDone]    else []
+                                                      UnassignTask ->    maybe [] (const [UnassignedTask]) (assigned w)
+                                                      PostponeTask -> if status w   == Started  then [PostponedTask] else []
+                                                      StartTask    -> if status w   == Waiting  then [TaskStarted]   else []
 
 applyEventWorkflow :: WorkflowTyper EventApplier
 applyEventWorkflow = EventApplier $ \w e -> case e of
                                                   AssignedTask u -> instanciateWorkflow $ w { assigned = Just u }
-                                                  Done -> instanciateWorkflow $ w { status = Archived }
-                                                  TaskReDone -> instanciateWorkflow $ w { status = Waiting }
+                                                  Done           -> instanciateWorkflow $ w { status = Archived }
+                                                  TaskReDone     -> instanciateWorkflow $ w { status = Waiting }
                                                   UnassignedTask -> instanciateWorkflow $ w { assigned = Nothing }
-                                                  PostponedTask -> instanciateWorkflow $ w { status = Waiting }
-                                                  TaskStarted -> instanciateWorkflow $ w { status = Started }
-                                                  _ -> undefined
+                                                  PostponedTask  -> instanciateWorkflow $ w { status = Waiting }
+                                                  TaskStarted    -> instanciateWorkflow $ w { status = Started }
