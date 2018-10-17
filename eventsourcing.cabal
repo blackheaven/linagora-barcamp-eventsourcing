@@ -19,7 +19,7 @@ library
   ghc-options:         -Wall
   hs-source-dirs:      src
   exposed-modules:     EventSource
-                     , Workflow
+                     , TaskWorkflow
   build-depends:       base >= 4.7 && < 5
 
 executable eventsourcing
