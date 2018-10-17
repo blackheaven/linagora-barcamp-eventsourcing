@@ -66,6 +66,4 @@ applyEventTaskWorkflow = EventApplier $ \a e -> case e of
                                                      UnassignedTask -> updateTaskWorkflow a (\t -> t { assigned = Nothing }) e
                                                      PostponedTask  -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
                                                      TaskStarted    -> updateTaskWorkflow a (\t -> t { status = Started }) e
-
-updateTaskWorkflow :: TaskWorkflowTyper Aggregate -> (TaskWorkflow -> TaskWorkflow) -> TaskWorkflowEvent -> TaskWorkflowTyper Aggregate
-updateTaskWorkflow a t e = a { projection = t (projection a), events = e:(events a) }
+    where updateTaskWorkflow a t e = a { projection = t (projection a), events = e:(events a) }
