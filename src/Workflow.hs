@@ -2,6 +2,7 @@ module Workflow
     (
       workflow
     , newWorkflow
+    , WorkflowTyper
     , User(..)
     , WorkflowCommand(..)
     , WorkflowEvent(..)
@@ -14,15 +15,21 @@ type WorkflowTyper a = a Workflow WorkflowCommand WorkflowEvent
 newtype User = User String
     deriving (Show, Eq)
 
+data Status = Waiting
+            | Started
+            | Archived
+    deriving (Show, Eq)
+
 data Workflow = Workflow {
                 assigned :: Maybe User
+              , status :: Status
               } deriving (Show, Eq)
 
 data WorkflowCommand = AssignTask User
                      | AchieveTask
                      | RestartTask
                      | UnassignTask
-                     | PostoneTask
+                     | PostponeTask
                      | StartTask
     deriving (Show, Eq)
 
@@ -35,22 +42,30 @@ data WorkflowEvent = AssignedTask User
     deriving (Show, Eq)
 
 newWorkflow :: Workflow
-newWorkflow = Workflow Nothing
+newWorkflow = Workflow Nothing Waiting
 
 workflow :: WorkflowTyper Aggregate
 workflow = instanciateWorkflow newWorkflow
 
 instanciateWorkflow :: Workflow -> WorkflowTyper Aggregate
-instanciateWorkflow x = Aggregate x applyCommandWorkflow applyEventWorkflow
+instanciateWorkflow w = Aggregate w applyCommandWorkflow applyEventWorkflow
 
 applyCommandWorkflow :: WorkflowTyper CommandApplier
-applyCommandWorkflow = CommandApplier $ \ x c -> case c of
-                                                      AssignTask u -> if assigned x == Just u then [] else [AssignedTask u]
-                                                      UnassignTask -> maybe [] (const [UnassignedTask]) (assigned x)
+applyCommandWorkflow = CommandApplier $ \ w c -> case c of
+                                                      AssignTask u -> if assigned w == Just u then [] else [AssignedTask u]
+                                                      AchieveTask -> if status w == Started then [Done] else []
+                                                      RestartTask -> if status w == Archived then [TaskReDone] else []
+                                                      UnassignTask -> maybe [] (const [UnassignedTask]) (assigned w)
+                                                      PostponeTask -> if status w == Started then [PostponedTask] else []
+                                                      StartTask -> if status w == Waiting then [TaskStarted] else []
                                                       _ -> undefined
 
 applyEventWorkflow :: WorkflowTyper EventApplier
-applyEventWorkflow = EventApplier $ \x e -> case e of
-                                                  AssignedTask u -> instanciateWorkflow $ x { assigned = Just u }
-                                                  UnassignedTask -> instanciateWorkflow $ x { assigned = Nothing }
+applyEventWorkflow = EventApplier $ \w e -> case e of
+                                                  AssignedTask u -> instanciateWorkflow $ w { assigned = Just u }
+                                                  Done -> instanciateWorkflow $ w { status = Archived }
+                                                  TaskReDone -> instanciateWorkflow $ w { status = Waiting }
+                                                  UnassignedTask -> instanciateWorkflow $ w { assigned = Nothing }
+                                                  PostponedTask -> instanciateWorkflow $ w { status = Waiting }
+                                                  TaskStarted -> instanciateWorkflow $ w { status = Started }
                                                   _ -> undefined
