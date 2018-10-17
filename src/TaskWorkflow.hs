@@ -3,6 +3,7 @@ module TaskWorkflow
       waitingTaskWorkflow
     , newTaskWorkflow
     , TaskWorkflowTyper
+    , TaskWorkflowId(..)
     , User(..)
     , TaskWorkflowCommand(..)
     , TaskWorkflowEvent(..)
@@ -11,6 +12,9 @@ module TaskWorkflow
 import EventSource(Aggregate(..), Decision(..), Projection(..))
 
 type TaskWorkflowTyper a = a TaskWorkflow TaskWorkflowCommand TaskWorkflowEvent
+
+newtype TaskWorkflowId = TaskWorkflowId Integer
+    deriving (Show, Eq)
 
 newtype User = User String
     deriving (Show, Eq)
@@ -21,7 +25,8 @@ data Status = Waiting
     deriving (Show, Eq)
 
 data TaskWorkflow = TaskWorkflow {
-                    assigned :: Maybe User
+                    taskWorkflowId :: TaskWorkflowId
+                  , assigned :: Maybe User
                   , status :: Status
                   } deriving (Show, Eq)
 
@@ -41,11 +46,11 @@ data TaskWorkflowEvent = AssignedTask User
                        | TaskStarted
     deriving (Show, Eq)
 
-newTaskWorkflow :: TaskWorkflow
-newTaskWorkflow = TaskWorkflow Nothing Waiting
+newTaskWorkflow :: TaskWorkflowId -> TaskWorkflow
+newTaskWorkflow x = TaskWorkflow x Nothing Waiting
 
-waitingTaskWorkflow :: TaskWorkflowTyper Aggregate
-waitingTaskWorkflow = Aggregate newTaskWorkflow [] applyCommandTaskWorkflow applyEventTaskWorkflow
+waitingTaskWorkflow :: TaskWorkflowId -> TaskWorkflowTyper Aggregate
+waitingTaskWorkflow x = Aggregate (newTaskWorkflow x) [] applyCommandTaskWorkflow applyEventTaskWorkflow
 
 applyCommandTaskWorkflow :: TaskWorkflowTyper Decision
 applyCommandTaskWorkflow = Decision $ \a c -> case c of
