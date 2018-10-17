@@ -45,25 +45,27 @@ newTaskWorkflow :: TaskWorkflow
 newTaskWorkflow = TaskWorkflow Nothing Waiting
 
 waitingTaskWorkflow :: TaskWorkflowTyper Aggregate
-waitingTaskWorkflow = instanciateTaskWorkflow newTaskWorkflow
-
-instanciateTaskWorkflow :: TaskWorkflow -> TaskWorkflowTyper Aggregate
-instanciateTaskWorkflow w = Aggregate w applyCommandTaskWorkflow applyEventTaskWorkflow
+waitingTaskWorkflow = Aggregate newTaskWorkflow [] applyCommandTaskWorkflow applyEventTaskWorkflow
 
 applyCommandTaskWorkflow :: TaskWorkflowTyper CommandApplier
-applyCommandTaskWorkflow = CommandApplier $ \ w c -> case c of
-                                                          AssignTask u -> if assigned w == Just u   then [] else [AssignedTask u]
-                                                          AchieveTask  -> if status w   == Started  then [Done]          else []
-                                                          RestartTask  -> if status w   == Archived then [TaskReDone]    else []
-                                                          UnassignTask ->    maybe [] (const [UnassignedTask]) (assigned w)
-                                                          PostponeTask -> if status w   == Started  then [PostponedTask] else []
-                                                          StartTask    -> if status w   == Waiting  then [TaskStarted]   else []
+applyCommandTaskWorkflow = CommandApplier $ \a c -> case c of
+                                                         AssignTask u -> onNotAssigned a (Just u) [AssignedTask u]
+                                                         AchieveTask  -> onStatus a Started [Done]
+                                                         RestartTask  -> onStatus a Archived [TaskReDone]
+                                                         UnassignTask -> onNotAssigned a Nothing [UnassignedTask]
+                                                         PostponeTask -> onStatus a Started [PostponedTask]
+                                                         StartTask    -> onStatus a Waiting [TaskStarted]
+    where onStatus a v x = if status (projection a) == v then x else []
+          onNotAssigned a v x = if assigned (projection a) == v then [] else x
 
 applyEventTaskWorkflow :: TaskWorkflowTyper EventApplier
-applyEventTaskWorkflow = EventApplier $ \w e -> case e of
-                                                     AssignedTask u -> instanciateTaskWorkflow $ w { assigned = Just u }
-                                                     Done           -> instanciateTaskWorkflow $ w { status = Archived }
-                                                     TaskReDone     -> instanciateTaskWorkflow $ w { status = Waiting }
-                                                     UnassignedTask -> instanciateTaskWorkflow $ w { assigned = Nothing }
-                                                     PostponedTask  -> instanciateTaskWorkflow $ w { status = Waiting }
-                                                     TaskStarted    -> instanciateTaskWorkflow $ w { status = Started }
+applyEventTaskWorkflow = EventApplier $ \a e -> case e of
+                                                     AssignedTask u -> updateTaskWorkflow a (\t -> t { assigned = Just u }) e
+                                                     Done           -> updateTaskWorkflow a (\t -> t { status = Archived }) e
+                                                     TaskReDone     -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
+                                                     UnassignedTask -> updateTaskWorkflow a (\t -> t { assigned = Nothing }) e
+                                                     PostponedTask  -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
+                                                     TaskStarted    -> updateTaskWorkflow a (\t -> t { status = Started }) e
+
+updateTaskWorkflow :: TaskWorkflowTyper Aggregate -> (TaskWorkflow -> TaskWorkflow) -> TaskWorkflowEvent -> TaskWorkflowTyper Aggregate
+updateTaskWorkflow a t e = a { projection = t (projection a), events = e:(events a) }
