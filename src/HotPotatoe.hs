@@ -9,10 +9,11 @@ module HotPotatoe
 import EventSource(Event(..), AggregateId, Projection(..))
 import TaskWorkflow(TaskWorkflowEvent(..))
 
-import Data.Map(empty, Map, alter, lookupMax)
-import Data.Maybe(fromJust)
+import Data.Function(on)
+import Data.List(maximumBy)
+import Data.Map(empty, Map, alter, assocs)
 
-data TasksStats = TasksStats (Map AggregateId Integer)
+data TasksStats = TasksStats (Map AggregateId Integer) deriving (Show, Eq)
 
 hotPotatoe :: Projection TaskWorkflowEvent TasksStats
 hotPotatoe = Projection $ \(TasksStats s) e -> TasksStats $ if isAssignation (eventValue e)
@@ -23,7 +24,7 @@ newHotPotatoe :: TasksStats
 newHotPotatoe = TasksStats empty
 
 getPotato :: TasksStats -> AggregateId
-getPotato (TasksStats m) = fst $ fromJust $ lookupMax m
+getPotato (TasksStats m) = fst $ maximumBy (compare `on` snd) $ assocs m
 
 isAssignation :: TaskWorkflowEvent -> Bool
 isAssignation e = case e of

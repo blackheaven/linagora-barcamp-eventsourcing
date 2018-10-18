@@ -50,8 +50,7 @@ applyCommand a is e = (extractCommandApplier . applyCommand') a a is e
 
 applyCommands :: Eq e => Aggregate a c e -> [e -> Event e] -> [c] ->  [Event e]
 applyCommands a is xs = concat $ reverse $ fst $ snd $ foldl' apply (a, ([],is)) xs
-  where apply :: Eq e => (Aggregate a c e, ([[Event e]], [e -> Event e])) -> c -> (Aggregate a c e, ([[Event e]], [e -> Event e]))
-        apply (s, (es,iss)) c = let evs = applyCommand s iss c in (applyEvents s evs, (evs:es, drop (length evs) iss))
+  where apply (s, (es,iss)) c = let evs = applyCommand s iss c in (applyEvents s evs, (evs:es, drop (length evs) iss))
 
 applyEvents :: Eq e => Aggregate a c e -> [Event e] -> Aggregate a c e
 applyEvents a xs = computeProjection (ensureIdemPotence $ applyEvent' a) a xs
@@ -61,5 +60,9 @@ ensureIdemPotence p = Projection $ \a e -> if notElem e (events a)
                                              then extractEventApplier p a e
                                              else a
 
-computeProjection :: Projection e a -> a -> [Event e] -> a
-computeProjection p i e = foldl' (extractEventApplier p) i e
+computeProjection :: Eq e => Projection e a -> a -> [Event e] -> a
+computeProjection p i es = fst $ foldl' apply (i,[]) es
+  where apply (x,aes) e = if notElem e aes
+                            then (extractEventApplier p x e, (e:aes))
+                            else (x, aes)
+

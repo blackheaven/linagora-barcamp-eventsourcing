@@ -5,10 +5,10 @@ version:             0.1.0.0
 homepage:            https://github.com/githubuser/eventsourcing
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2018 Author name here
-category:            Acme
+author:              Gautier DI FOLCO
+maintainer:          gautier.difolco@gmail.com
+copyright:           2018 Gautier DI FOLCO
+category:            event-sourcing
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
