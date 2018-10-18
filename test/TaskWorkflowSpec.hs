@@ -22,7 +22,7 @@ startedTask :: TaskWorkflowTyper Aggregate
 startedTask = applyEvents waitingTask [Event (EventId 1) task1 TaskStarted]
 
 achievedTask :: TaskWorkflowTyper Aggregate
-achievedTask = applyEvents startedTask [Event (EventId 1) task1 Done]
+achievedTask = applyEvents startedTask [Event (EventId 2) task1 Done]
 
 eventsCreator :: [e -> Event e]
 eventsCreator = map (\i -> \e -> Event (EventId i) task1 e) [5..]

@@ -35,3 +35,5 @@ spec =
       getPotato (computeProjection hotPotatoe newHotPotatoe [Event (EventId 1) taskId1 (AssignedTask user1), Event (EventId 2) taskId2 (AssignedTask user2), Event (EventId 2) taskId1 UnassignedTask]) `shouldNotBe` taskId1
     it "given one valid event and two invalids on two tasks the projection should give the hitted one" $ do
       getPotato (computeProjection hotPotatoe newHotPotatoe [Event (EventId 1) taskId1 Done, Event (EventId 1) taskId2 (AssignedTask user2), Event (EventId 2) taskId1 PostponedTask]) `shouldNotBe` taskId1
+    it "given three valid events and two duplicated on two tasks the projection should give the most hitted one" $ do
+      getPotato (computeProjection hotPotatoe newHotPotatoe [Event (EventId 1) taskId1 (AssignedTask user1), Event (EventId 2) taskId2 (AssignedTask user2), Event (EventId 2) taskId1 UnassignedTask, Event (EventId 2) taskId2 (AssignedTask user2), Event (EventId 2) taskId2 (AssignedTask user2)]) `shouldNotBe` taskId1

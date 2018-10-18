@@ -48,14 +48,18 @@ newtype Projection e a = Projection { extractEventApplier :: a -> Event e -> a }
 applyCommand :: Aggregate a c e -> [e -> Event e] -> c -> [Event e]
 applyCommand a is e = (extractCommandApplier . applyCommand') a a is e
 
-applyCommands :: Aggregate a c e -> [e -> Event e] -> [c] ->  [Event e]
+applyCommands :: Eq e => Aggregate a c e -> [e -> Event e] -> [c] ->  [Event e]
 applyCommands a is xs = concat $ reverse $ fst $ snd $ foldl' apply (a, ([],is)) xs
-  where apply :: (Aggregate a c e, ([[Event e]], [e -> Event e])) -> c -> (Aggregate a c e, ([[Event e]], [e -> Event e]))
+  where apply :: Eq e => (Aggregate a c e, ([[Event e]], [e -> Event e])) -> c -> (Aggregate a c e, ([[Event e]], [e -> Event e]))
         apply (s, (es,iss)) c = let evs = applyCommand s iss c in (applyEvents s evs, (evs:es, drop (length evs) iss))
 
-applyEvents :: Aggregate a c e -> [Event e] -> Aggregate a c e
-applyEvents a xs = computeProjection (applyEvent' a) a xs
--- TODO check already applied Event
+applyEvents :: Eq e => Aggregate a c e -> [Event e] -> Aggregate a c e
+applyEvents a xs = computeProjection (ensureIdemPotence $ applyEvent' a) a xs
+
+ensureIdemPotence :: Eq e => Projection e (Aggregate a c e) -> Projection e (Aggregate a c e)
+ensureIdemPotence p = Projection $ \a e -> if notElem e (events a)
+                                             then extractEventApplier p a e
+                                             else a
 
 computeProjection :: Projection e a -> a -> [Event e] -> a
 computeProjection p i e = foldl' (extractEventApplier p) i e

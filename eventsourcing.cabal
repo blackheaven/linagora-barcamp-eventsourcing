@@ -20,6 +20,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     EventSource
                      , HotPotatoe
+                     , Persistence
                      , PubSub
                      , TaskWorkflow
   build-depends:       base >= 4.7 && < 5
