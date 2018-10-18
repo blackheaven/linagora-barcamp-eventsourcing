@@ -3,20 +3,42 @@ module PubSubSpec where
 import Test.Hspec
 import Test.Hspec.QuickCheck
 
--- import EventSource
--- import HotPotatoe
--- import TaskWorkflow
--- import PubSub
+import EventSource
+import HotPotatoe
+import TaskWorkflow
+import PubSub
+
+taskId1 :: AggregateId
+taskId1 = AggregateId 1
+
+taskId2 :: AggregateId
+taskId2 = AggregateId 2
+
+user1 :: User
+user1 = User "alice"
+
+user2 :: User
+user2 = User "bob"
+
+task1 :: TaskWorkflowTyper Aggregate
+task1 = waitingTaskWorkflow taskId1
+
+task2 :: TaskWorkflowTyper Aggregate
+task2 = waitingTaskWorkflow taskId2
+
+pubSubHotP :: PubSub TaskWorkflowEvent TasksStats
+pubSubHotP = subscribe hotPotatoe newHotPotatoe newPubSub
 
 main :: IO ()
 main = hspec spec
 
 spec :: Spec
 spec =
-  describe "Projection" $ do
+  describe "PubSub" $ do
     describe "HotPotatoe" $ do
       it "given three valid events on two tasks the projection should give the most hitted one" $ do
-        1 `shouldNotBe` 2
-        -- getPotato (computeProjection hotPotatoe newHotPotatoe [(taskId1, AssignedTask user1), (taskId2, AssignedTask user2), (taskId1, UnassignedTask)]) `shouldNotBe` taskId1
-      -- it "given one valid event and two invalids on two tasks the projection should give the hitted one" $ do
-        -- getPotato (computeProjection hotPotatoe newHotPotatoe [(taskId1, Done), (taskId2, AssignedTask user2), (taskId1, PostponedTask)]) `shouldNotBe` taskId1
+        (map getPotato . fetchViews) (foldr publish pubSubHotP [Event (EventId 1) taskId1 (AssignedTask user1), Event (EventId 2) taskId2 (AssignedTask user2), Event (EventId 2) taskId1 UnassignedTask]) `shouldNotBe` [taskId1]
+      it "given one valid event and two invalids on two tasks the projection should give the hitted one" $ do
+        (map getPotato . fetchViews)  (foldr publish pubSubHotP [Event (EventId 1) taskId1 Done, Event (EventId 1) taskId2 (AssignedTask user2), Event (EventId 2) taskId1 PostponedTask]) `shouldNotBe` [taskId1]
+      it "given three valid events and two duplicated on two tasks the projection should give the most hitted one" $ do
+        (map getPotato . fetchViews)  (foldr publish pubSubHotP [Event (EventId 1) taskId1 (AssignedTask user1), Event (EventId 2) taskId2 (AssignedTask user2), Event (EventId 2) taskId1 UnassignedTask, Event (EventId 2) taskId2 (AssignedTask user2), Event (EventId 2) taskId2 (AssignedTask user2)]) `shouldNotBe` [taskId1]
