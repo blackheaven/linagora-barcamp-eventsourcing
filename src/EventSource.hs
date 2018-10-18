@@ -1,49 +1,61 @@
 module EventSource
     (
       Aggregate(..)
+    , AggregateId(..)
     , applyCommand
     , applyCommands
-    , applyEvent
     , applyEvents
     , computeProjection
     , Decision(..)
     , Projection(..)
-    , DecisionProjection(..)
+    , Event(..)
+    , EventId(..)
     ) where
 
 import Data.Foldable(foldl')
 
 data Aggregate a c e = Aggregate {
-                       projection :: a
-                     , events :: [e]
+                       aggregateId :: AggregateId
+                     , projection :: a
+                     , events :: [Event e]
                      , applyCommand' :: Decision a c e
-                     , applyEvent' :: DecisionProjection a c e
+                     , applyEvent' :: Projection e (Aggregate a c e)
                      }
 
+newtype AggregateId = AggregateId Integer deriving (Show, Eq, Ord)
+
 instance (Show a, Show e) => Show (Aggregate a c e) where
-    show x = "Aggregate " ++ show (projection x) ++ " : " ++ show (reverse $ events x)
+    show x = "Aggregate " ++ show (aggregateId x) ++ " (" ++ show (projection x) ++ ") : " ++ show (reverse $ events x)
 
 instance Eq a => Eq (Aggregate a e c) where
-    (Aggregate a _ _ _) == (Aggregate b _ _ _) = a == b
+    (Aggregate _ a _ _ _) == (Aggregate _ b _ _ _) = a == b
 
-newtype Decision a c e = Decision { extractCommandApplier :: Aggregate a c e -> c -> [e] }
+data Event e = Event {
+               eventId :: EventId
+             , eventAggregateId :: AggregateId
+             , eventValue :: e
+             } deriving (Show)
 
-newtype Projection a e z = Projection { extractEventApplier :: z -> (a,e) -> z }
+instance Eq e => Eq (Event e) where
+    (Event a _ _) == (Event b _ _) = a == b
 
-newtype DecisionProjection a c e = DecisionProjection { extractDecisionProjectionApplier :: Aggregate a c e -> e -> Aggregate a c e}
+newtype EventId = EventId Integer deriving (Show, Eq, Ord)
 
-applyCommand :: Aggregate a c e -> c -> [e]
-applyCommand a xs = (extractCommandApplier . applyCommand') a a xs
+newtype Decision a c e = Decision { extractCommandApplier :: Aggregate a c e -> [e -> Event e] -> c -> [Event e] }
 
-applyCommands :: Aggregate a c e -> [c] -> [e]
-applyCommands a xs = concat $ reverse $ snd $ foldl' apply (a, []) xs
-  where apply (s, es) c = let evs = applyCommand s c in (applyEvents s evs, evs:es)
+newtype Projection e a = Projection { extractEventApplier :: a -> Event e -> a }
 
-applyEvent :: Aggregate a c e -> e -> Aggregate a c e
-applyEvent a xs = (extractDecisionProjectionApplier . applyEvent') a a xs
+applyCommand :: Aggregate a c e -> [e -> Event e] -> c -> [Event e]
+applyCommand a is e = (extractCommandApplier . applyCommand') a a is e
 
-applyEvents :: Aggregate a c e -> [e] -> Aggregate a c e
-applyEvents a xs = foldl' applyEvent a xs
+applyCommands :: Aggregate a c e -> [e -> Event e] -> [c] ->  [Event e]
+applyCommands a is xs = concat $ reverse $ fst $ snd $ foldl' apply (a, ([],is)) xs
+  where apply :: (Aggregate a c e, ([[Event e]], [e -> Event e])) -> c -> (Aggregate a c e, ([[Event e]], [e -> Event e]))
+        apply (s, (es,iss)) c = let evs = applyCommand s iss c in (applyEvents s evs, (evs:es, drop (length evs) iss))
 
-computeProjection :: Projection a e z -> z -> [(a,e)] -> z
+applyEvents :: Aggregate a c e -> [Event e] -> Aggregate a c e
+applyEvents a xs = computeProjection (applyEvent' a) a xs
+-- TODO check already applied Event
+
+computeProjection :: Projection e a -> a -> [Event e] -> a
 computeProjection p i e = foldl' (extractEventApplier p) i e

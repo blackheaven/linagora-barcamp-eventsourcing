@@ -1,4 +1,4 @@
-module Projection
+module HotPotatoe
     (
       hotPotatoe
     , newHotPotatoe
@@ -6,23 +6,23 @@ module Projection
     , getPotato
     ) where
 
-import EventSource(Projection(..))
-import TaskWorkflow(TaskWorkflowId(..), TaskWorkflowEvent(..))
+import EventSource(Event(..), AggregateId, Projection(..))
+import TaskWorkflow(TaskWorkflowEvent(..))
 
 import Data.Map(empty, Map, alter, lookupMax)
 import Data.Maybe(fromJust)
 
-data TasksStats = TasksStats (Map TaskWorkflowId Integer)
+data TasksStats = TasksStats (Map AggregateId Integer)
 
-hotPotatoe :: Projection TaskWorkflowId TaskWorkflowEvent TasksStats
-hotPotatoe = Projection $ \(TasksStats s) (i,e) -> TasksStats $ if isAssignation e
-                                                                  then alter (Just . maybe 1 (+ 1)) i s
+hotPotatoe :: Projection TaskWorkflowEvent TasksStats
+hotPotatoe = Projection $ \(TasksStats s) e -> TasksStats $ if isAssignation (eventValue e)
+                                                                  then alter (Just . maybe 1 (+ 1)) (eventAggregateId e) s
                                                                   else s
 
 newHotPotatoe :: TasksStats
 newHotPotatoe = TasksStats empty
 
-getPotato :: TasksStats -> TaskWorkflowId
+getPotato :: TasksStats -> AggregateId
 getPotato (TasksStats m) = fst $ fromJust $ lookupMax m
 
 isAssignation :: TaskWorkflowEvent -> Bool

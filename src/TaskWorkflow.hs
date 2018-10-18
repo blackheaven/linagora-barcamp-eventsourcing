@@ -3,19 +3,16 @@ module TaskWorkflow
       waitingTaskWorkflow
     , newTaskWorkflow
     , TaskWorkflowTyper
-    , TaskWorkflowId(..)
     , User(..)
     , TaskWorkflowCommand(..)
     , TaskWorkflowEvent(..)
     , TaskWorkflow(..)
     ) where
 
-import EventSource(Aggregate(..), Decision(..), Projection(..), DecisionProjection(..))
+import EventSource(Aggregate(..), AggregateId, Decision(..), Event(..), Projection(..))
 
 type TaskWorkflowTyper a = a TaskWorkflow TaskWorkflowCommand TaskWorkflowEvent
-
-newtype TaskWorkflowId = TaskWorkflowId { getTaskWorkflowId :: Integer }
-    deriving (Show, Eq, Ord)
+type TaskWorkflowTyper' a = a TaskWorkflowEvent (TaskWorkflowTyper Aggregate)
 
 newtype User = User String
     deriving (Show, Eq)
@@ -26,8 +23,7 @@ data Status = Waiting
     deriving (Show, Eq)
 
 data TaskWorkflow = TaskWorkflow {
-                    taskWorkflowId :: TaskWorkflowId
-                  , assigned :: Maybe User
+                    assigned :: Maybe User
                   , status :: Status
                   } deriving (Show, Eq)
 
@@ -47,29 +43,30 @@ data TaskWorkflowEvent = AssignedTask User
                        | TaskStarted
     deriving (Show, Eq)
 
-newTaskWorkflow :: TaskWorkflowId -> TaskWorkflow
-newTaskWorkflow x = TaskWorkflow x Nothing Waiting
+newTaskWorkflow :: TaskWorkflow
+newTaskWorkflow = TaskWorkflow Nothing Waiting
 
-waitingTaskWorkflow :: TaskWorkflowId -> TaskWorkflowTyper Aggregate
-waitingTaskWorkflow x = Aggregate (newTaskWorkflow x) [] applyCommandTaskWorkflow applyEventTaskWorkflow
+waitingTaskWorkflow :: AggregateId -> TaskWorkflowTyper Aggregate
+waitingTaskWorkflow x = Aggregate x newTaskWorkflow [] applyCommandTaskWorkflow applyEventTaskWorkflow
 
 applyCommandTaskWorkflow :: TaskWorkflowTyper Decision
-applyCommandTaskWorkflow = Decision $ \a c -> case c of
-                                                   AssignTask u -> onNotAssigned a (Just u) [AssignedTask u]
-                                                   AchieveTask  -> onStatus a Started [Done]
-                                                   RestartTask  -> onStatus a Archived [TaskReDone]
-                                                   UnassignTask -> onNotAssigned a Nothing [UnassignedTask]
-                                                   PostponeTask -> onStatus a Started [PostponedTask]
-                                                   StartTask    -> onStatus a Waiting [TaskStarted]
+applyCommandTaskWorkflow = Decision $ \a is c -> zipWith ($) is $
+    case c of
+        AssignTask u -> onNotAssigned a (Just u) [AssignedTask u]
+        AchieveTask  -> onStatus a Started [Done]
+        RestartTask  -> onStatus a Archived [TaskReDone]
+        UnassignTask -> onNotAssigned a Nothing [UnassignedTask]
+        PostponeTask -> onStatus a Started [PostponedTask]
+        StartTask    -> onStatus a Waiting [TaskStarted]
     where onStatus a v x = if status (projection a) == v then x else []
           onNotAssigned a v x = if assigned (projection a) == v then [] else x
 
-applyEventTaskWorkflow :: TaskWorkflowTyper DecisionProjection
-applyEventTaskWorkflow = DecisionProjection $ \a e -> case e of
-                                                           AssignedTask u -> updateTaskWorkflow a (\t -> t { assigned = Just u }) e
-                                                           Done           -> updateTaskWorkflow a (\t -> t { status = Archived }) e
-                                                           TaskReDone     -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
-                                                           UnassignedTask -> updateTaskWorkflow a (\t -> t { assigned = Nothing }) e
-                                                           PostponedTask  -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
-                                                           TaskStarted    -> updateTaskWorkflow a (\t -> t { status = Started }) e
+applyEventTaskWorkflow :: TaskWorkflowTyper' Projection
+applyEventTaskWorkflow = Projection $ \a e -> case eventValue e of
+                                                   AssignedTask u -> updateTaskWorkflow a (\t -> t { assigned = Just u }) e
+                                                   Done           -> updateTaskWorkflow a (\t -> t { status = Archived }) e
+                                                   TaskReDone     -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
+                                                   UnassignedTask -> updateTaskWorkflow a (\t -> t { assigned = Nothing }) e
+                                                   PostponedTask  -> updateTaskWorkflow a (\t -> t { status = Waiting }) e
+                                                   TaskStarted    -> updateTaskWorkflow a (\t -> t { status = Started }) e
     where updateTaskWorkflow a t e = a { projection = t (projection a), events = e:(events a) }

@@ -8,25 +8,22 @@ module PubSub
     , fetchViews
     ) where
 
-import EventSource(computeProjection, Projection)
+import EventSource(computeProjection, Projection, Event)
 
-import Data.Map(empty, Map, alter, lookupMax)
-import Data.Maybe(fromJust)
+data PubSub e a = PubSub { 
+                  getPubEvents :: [Event e]
+                , getSubsribers :: [(Projection e a, a)]
+                }
 
-data PubSub i e p = PubSub { 
-                    getPubEvents :: [(i, e)]
-                  , getSubsribers :: [(Projection i e p, p)]
-                  }
-
-newPubSub :: PubSub i e p
+newPubSub :: PubSub e p
 newPubSub = PubSub [] []
 
-publish :: i -> e -> PubSub i e p -> PubSub i e p
-publish i e s = s { getPubEvents = (i, e):getPubEvents s }
+publish :: Event e -> PubSub e a -> PubSub e a
+publish e s = s { getPubEvents = e:getPubEvents s }
 
-subscribe :: Show p => Projection i e p -> p -> PubSub i e p -> PubSub i e p
+subscribe :: Projection e a -> a -> PubSub e a -> PubSub e a
 subscribe p d s = s { getSubsribers = (p, d):getSubsribers s }
 
-fetchViews :: PubSub a e p -> [p]
+fetchViews :: PubSub e a -> [a]
 fetchViews s = map (\(p,d) -> computeProjection p d es) (getSubsribers s)
   where es = reverse $ getPubEvents s
